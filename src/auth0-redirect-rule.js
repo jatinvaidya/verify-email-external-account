@@ -73,7 +73,7 @@ function (user, context, mainCallback) {
         };
 
         // mark email as verified
-        let setEmailVerified = user => {
+        let setEmailVerified = () => {
             console.log("setting email_verified to true");
             var headers = {
                 'Authorization': 'Bearer ' + auth0.accessToken,
@@ -84,8 +84,16 @@ function (user, context, mainCallback) {
 
             // calback for setting email verified
             let setEmailVerifiedCallback = (err, response, body) => {
-                if(err) console.error(`[setEmailVerified] error: ${err}`);
                 console.log(`[setEmailVerified] response: ${JSON.stringify(response)}`);
+                if(err) console.error(`[setEmailVerified] error: ${err}`);
+                else {
+                    // this isn't working - id_token does not show ...
+                    // ... the updated value for email_verified claim
+                    // bug or wad? if wad, whats the workaround?
+                    console.log("setting email_verified claim as true in id_token");
+                    context.idToken.email_verified = true;
+                    user.email_verified = true;
+                }
             };
 
             // execute request
@@ -99,20 +107,13 @@ function (user, context, mainCallback) {
         // rule environment variables
         const pwdlessClientId = configuration.PWDLESS_CLIENT_ID;
         const optCollectionSpaUrl = configuration.OTP_COLLECTION_SPA_URL;
-        //const otpRetryMax = configuration.OTP_RETRY_MAX;
 
         // check if we have returned using a /continue request
         if (context.protocol === "redirect-callback") {
-            let resendOtpAction = context.request.body.resend;
             let verifyOtpAction = context.request.body.verify;
             if(verifyOtpAction !== undefined) {
                 console.info(`verify user provided otp: ${context.request.body.otp}`);
                 verifyOtp(pwdlessClientId, user.email, context.request.body.otp);
-            } else if(resendOtpAction !== undefined) {
-                console.info("resend otp to user");
-                sendOtp(pwdlessClientId, user.email);
-                console.info("redirect user to otp collection spa");
-                collectOtp();   
             }
         } else {
             console.info("send otp to user");
