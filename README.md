@@ -36,5 +36,6 @@ On Auth0 tenant setup a `rule` with code from `src/auth0-redirect-rule.js`
    
    This must be the absolute url to `this` SPA application
 
-
+#### Flow Sequence ####
+https://tinyurl.com/texp2hn
 
