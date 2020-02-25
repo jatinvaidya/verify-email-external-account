@@ -212,6 +212,7 @@
 
          let createUser = (email, connection) => new Promise((resolve, reject) => {
              console.log(`[createUser] email: ${email} and connection: ${connection}`);
+             let randomstring = require("randomstring");
              getMgmtApiAccessToken()
                  .then(mgmtApiAccessToken => {
                      var headers = {
@@ -220,7 +221,9 @@
                      let data = {
                          "connection": `${connection}`,
                          "email": `${email}`,
-                         "password": "Cde34rfv!23"
+                         "password": `${randomstring.generate({
+                            length: 12
+                          })}`
                      };
                      // calback for create user
                      let createUserCallback = (err, response, body) => {
@@ -256,7 +259,7 @@
                      };
                      let data = {
                          "provider": "oidc",
-                         "connection_id": "con_eZqPvzgVbRaUA4b2",
+                         "connection_id": `${configuration.ENTERPRISE_CONN_ID}`,
                          "user_id": `${user.user_id}`
                      };
                      // calback for create user
@@ -268,6 +271,9 @@
                          } else {
                              if (response.statusCode === 201) {
                                  console.log("[linkUsers] resolving promise");
+                                 // since authenticating user became secondary
+                                 // issue id_token of primary user (not secondary)
+                                 context.primaryUser = `${primaryUserId}`;
                                  resolve();
                              } else {
                                  console.error("[linkUsers] rejecting promise");
