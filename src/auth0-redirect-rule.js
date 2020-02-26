@@ -1,29 +1,34 @@
  function (user, context, mainCallback) {
 
      console.log("---------------- executing rules -----------------");
-     // target this rule only for a specific end-user app and 
+     // target this rule only for a specific enterprise connection and 
      // only if authenticated user's email is not verified
-     if (context.clientID === configuration.END_USER_CLIENT_ID &&
-         !user.email_verified) {
-
+     const enterpriseConnId = configuration.ENTERPRISE_CONN_ID;
+     if (context.connectionID === enterpriseConnId && !user.email_verified) {
          // require
          const request = require('request');
 
          // rule environment variables
          const pwdlessClientId = configuration.PWDLESS_CLIENT_ID;
+         const pwdlessClientSecret = configuration.PWDLESS_CLIENT_SECRET;
          const optCollectionSpaUrl = configuration.OTP_COLLECTION_SPA_URL;
          const mgmtApiClientId = configuration.MGMT_API_CLIENT_ID;
          const mgmtApiClientSecret = configuration.MGMT_API_CLIENT_SECRET;
+         const databaseConnName = configuration.DATABASE_CONN_NAME;
 
          // global variables
          let databaseUserId;
 
          // send otp to user 
          // @return: pwdlessUserId
-         let sendOtp = (clientId, email) => new Promise((resolve, reject) => {
+         let sendOtp = (clientId, clientSecret, email) => new Promise((resolve, reject) => {
              const url = `https://${auth0.domain}/passwordless/start`;
+             var headers = {
+                 'auth0-forwarded-for': context.request.ip
+             };
              const requestJson = {
                  "client_id": clientId,
+                 "client_secret": clientSecret,
                  "connection": "email",
                  "email": email,
                  "send": "code"
@@ -47,6 +52,7 @@
              };
              request.post({
                  url: url,
+                 headers: headers,
                  json: requestJson
              }, sendOtpCallback);
          });
@@ -61,11 +67,15 @@
 
          // verify the otp
          // @return: nothing
-         let verifyOtp = (clientId, email, otp) => {
+         let verifyOtp = (clientId, clientSecret, email, otp) => {
              return new Promise((resolve, reject) => {
+                 var headers = {
+                     'auth0-forwarded-for': context.request.ip
+                 };
                  const requestJson = {
                      "grant_type": "http://auth0.com/oauth/grant-type/passwordless/otp",
                      "client_id": clientId,
+                     "client_secret": clientSecret,
                      "username": email,
                      "otp": otp,
                      "realm": "email"
@@ -93,6 +103,7 @@
                  const url = `https://${auth0.domain}/oauth/token`;
                  request.post({
                      url: url,
+                     headers: headers,
                      json: requestJson
                  }, verifyOtpCallback);
              });
@@ -259,8 +270,8 @@
                      };
                      let data = {
                          "provider": "oidc",
-                         "connection_id": `${configuration.ENTERPRISE_CONN_ID}`,
-                         "user_id": `${user.user_id}`
+                         "connection_id": enterpriseConnId,
+                         "user_id": user.user_id
                      };
                      // calback for create user
                      let linkUsersCallback = (err, response, body) => {
@@ -300,36 +311,43 @@
          // get AT for mgmt api
          // @return: AT
          let getMgmtApiAccessToken = () => new Promise((resolve, reject) => {
-             console.log("[getMgmtApiAccessToken] executing client_credentials grant");
-             var options = {
-                 method: 'POST',
-                 url: `https://${auth0.domain}/oauth/token`,
-                 headers: {
-                     'content-type': 'application/x-www-form-urlencoded'
-                 },
-                 form: {
-                     grant_type: 'client_credentials',
-                     client_id: mgmtApiClientId,
-                     client_secret: mgmtApiClientSecret,
-                     audience: `https://${auth0.domain}/api/v2/`
-                 }
-             };
-             let getMgmtApiAccessTokenCallback = (err, response, body) => {
-                 console.log(`[getMgmtApiAccessToken] response: ${JSON.stringify(response)}`);
-                 if (err) {
-                     console.log(`[getMgmtApiAccessToken] error: ${err}`);
-                     reject(err);
-                 } else {
-                     if (response.statusCode === 200) {
-                         console.log(`[getMgmtApiAccessToken] resolving promise with access_token: ${JSON.parse(body).access_token}`);
-                         resolve(JSON.parse(body).access_token);
-                     } else {
-                         console.error("[getMgmtApiAccessToken] rejecting promise");
-                         reject("[getMgmtApiAccessToken] failed");
+             if (global[mgmtApiClientId]) {
+                 console.log("[getMgmtApiAccessToken] found access_token in global cache");
+                 resolve(global[mgmtApiClientId]);
+             } else {
+                 console.log("[getMgmtApiAccessToken] executing client_credentials grant");
+                 var options = {
+                     method: 'POST',
+                     url: `https://${auth0.domain}/oauth/token`,
+                     headers: {
+                         'content-type': 'application/x-www-form-urlencoded'
+                     },
+                     form: {
+                         grant_type: 'client_credentials',
+                         client_id: mgmtApiClientId,
+                         client_secret: mgmtApiClientSecret,
+                         audience: `https://${auth0.domain}/api/v2/`
                      }
-                 }
-             };
-             request(options, getMgmtApiAccessTokenCallback);
+                 };
+                 let getMgmtApiAccessTokenCallback = (err, response, body) => {
+                     console.log(`[getMgmtApiAccessToken] response: ${JSON.stringify(response)}`);
+                     if (err) {
+                         console.log(`[getMgmtApiAccessToken] error: ${err}`);
+                         reject(err);
+                     } else {
+                         if (response.statusCode === 200) {
+                             console.log(`[getMgmtApiAccessToken] resolving promise with access_token: ${JSON.parse(body).access_token}`);
+                             let accessToken = JSON.parse(body).access_token;
+                             global[mgmtApiClientId] = accessToken;
+                             resolve(JSON.parse(body).access_token);
+                         } else {
+                             console.error("[getMgmtApiAccessToken] rejecting promise");
+                             reject("[getMgmtApiAccessToken] failed");
+                         }
+                     }
+                 };
+                 request(options, getMgmtApiAccessTokenCallback);
+             }
          });
 
          // check if we have returned using a /continue request
@@ -337,8 +355,8 @@
              let verifyOtpAction = context.request.body.verify;
              if (verifyOtpAction !== undefined) {
                  console.info(`verify user provided otp: ${context.request.body.otp}`);
-                 verifyOtp(pwdlessClientId, user.email, context.request.body.otp)
-                     .then(() => searchOrCreateUser(user.email, "Username-Password-Authentication"))
+                 verifyOtp(pwdlessClientId, pwdlessClientSecret, user.email, context.request.body.otp)
+                     .then(() => searchOrCreateUser(user.email, databaseConnName))
                      .then(databaseUserId => setEmailVerified(`auth0|${databaseUserId}`))
                      .then(() => searchUser(user.email, "email"))
                      .then(pwdlessUserId => deleteUser(`email|${pwdlessUserId}`))
@@ -348,7 +366,7 @@
              }
          } else {
              console.info("send otp to user");
-             sendOtp(pwdlessClientId, user.email);
+             sendOtp(pwdlessClientId, pwdlessClientSecret, user.email);
              console.info("redirect user to otp collection spa");
              collectOtp();
          }

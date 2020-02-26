@@ -5,6 +5,7 @@
       <input type="number" id="otp" name="otp">
       <input type="submit" name="verify" value="Verify" class="inputButton">
     </form>
+    <h3>Need CAPTCHA here</h3>
   </div>
 </template>
 
