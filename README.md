@@ -1,5 +1,11 @@
 # email-verify-otp
 
+This is a simple SPA using Vue that is redirected to from
+within an Auth0 (redirect-)rule.
+
+For flow details, please see
+https://tinyurl.com/r45q4ko
+
 ## Project setup
 ```
 npm install
