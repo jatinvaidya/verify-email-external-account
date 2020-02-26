@@ -4,7 +4,7 @@ This is a simple SPA using Vue that is redirected to from
 within an Auth0 (redirect-)rule.
 
 For flow details, please see
-https://tinyurl.com/r45q4ko
+https://tinyurl.com/r87n265
 
 ## Project setup
 ```
@@ -60,5 +60,5 @@ On Auth0 tenant setup a `rule` with code from `src/auth0-redirect-rule.js`
    The absolute url to `this` SPA application which collects email-OTP from the user
 
 #### Flow Sequence ####
-https://tinyurl.com/r45q4ko
+https://tinyurl.com/r87n265
 
