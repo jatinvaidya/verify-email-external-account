@@ -62,3 +62,28 @@ On Auth0 tenant setup a `rule` with code from `src/auth0-redirect-rule.js`
 #### Flow Sequence ####
 https://tinyurl.com/r87n265
 
+The following excerpt from `rule` code sums up the approach
+
+```
+// check if we have returned using a /continue request
+if (context.protocol === "redirect-callback") {
+   let verifyOtpAction = context.request.body.verify;
+   if (verifyOtpAction !== undefined) {
+      console.info("verify user provided otp");
+      verifyOtp(pwdlessClientId, pwdlessClientSecret, user.email, context.request.body.otp)
+         .then(() => searchOrCreateUser(user.email, databaseConnName))
+         .then(databaseUserId => setEmailVerified(`auth0|${databaseUserId}`))
+         .then(() => searchUser(user.email, "email"))
+         .then(pwdlessUserId => deleteUser(`email|${pwdlessUserId}`))
+         .then(() => linkUsers(databaseUserId))
+         .then(() => mainCallback(null, user, context))
+         .catch(error => mainCallback(new UnauthorizedError(error)));
+   }
+} else {
+   // start here
+   console.info("send otp to user");
+   sendOtp(pwdlessClientId, pwdlessClientSecret, user.email);
+   console.info("redirect user to otp collection spa");
+   collectOtp();
+}
+```
