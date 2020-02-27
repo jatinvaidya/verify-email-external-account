@@ -1,4 +1,4 @@
-# Auth0 - email verification using email-otp
+# Auth0 - Verify enterprise account email and link with database account
 
 This is a simple SPA using Vue that is redirected to from
 within an Auth0 (redirect-)rule.
